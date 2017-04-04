@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+<head>
+  <title>Sinico</title>
+  <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.4.1.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" />
+</head>
+<body>
+ <div class="container-fluid" style = "background: black">
+  <h1><span style = "font-family:monospace;color:white"><span class = "glyphicon glyphicon-eye-close"></span>Sinico</span></h1>
+  <div id="map-canvas" style="width:100%;height:400px"></div>
+  <div id = "btn-get">
+    <button class = "btn btn-info"><span class = "glyphicon glyphicon-send" style = "color: black">  <strong>  Send(Json)</strong> </span></button> 
+  </div>
+  <!--For displaying Coordinates as you move !-->
+  <div id = "cont" style = "font-family:monospace;color:white;background: black">
+    <h3> Co-ordinates</h3>
+  </div>
+  
+  <!--For displaying sent JSONs  !-->
+  <div id = "jsonDisp" style = "font-family:monospace;color:white;background: black">
+    
+  </div>
+</div>
+
+
+<script>
+  window.lat = 33.7561402;
+  window.lng = -84.3891;
+    //Location For target locations
+    var locations = [
+    ['Start', 33.7561402, -84.3891],
+    ['Inviter2', 33.7562, -84.38902]   
+    ];      
+    //Location for restricted locations
+    var reslocations = [
+    ['Safe', 33.7561302, -84.3892],
+    ['Top', 33.7542, -84.38702]   
+    ];
+
+
+    var map;      
+    var mark;   //Marker for position of user
+    var marker1;  //Marker for starting point
+    
+    var locObj = [{ "latitude":lat,  "longitude":lng }]; //For JSON
+
+    var lineCoords = [];
+    var initialize = function() {
+      map  = new google.maps.Map(document.getElementById('map-canvas'), {center:{lat:lat,lng:lng},zoom:20});
+      mark = new google.maps.Marker({position:{lat:lat, lng:lng}, map:map});
+      marker1 = new google.maps.Marker({
+        position: {lat:locations[0][1],lng:locations[0][2]},
+        map: map,
+        animation: google.maps.Animation.DROP,
+        label: 'A'
+        
+      });    
+        //Creates Markers on map according to Data from server (For Targets(Inviters))
+        for (var i = 1; i < locations.length; i++) {
+          location1 = locations[i];
+          var myLatLng = new google.maps.LatLng(location1[1], location1[2]);
+          var marker2 = new google.maps.Marker({
+            position: myLatLng,
+            map: map,
+            animation: google.maps.Animation.BOUNCE,
+            title: location1[0]
+            
+          });
+          
+        }  
+        lineCoords.push(new google.maps.LatLng(window.lat, window.lng));
+
+      };
+
+      window.initialize = initialize;
+
+      var redraw = function(payload) {
+        lat = payload.message.lat;
+        lng = payload.message.lng;
+        map.setCenter({lat:lat, lng:lng, alt:0});
+        mark.setPosition({lat:lat, lng:lng, alt:0});
+        lineCoords.push(new google.maps.LatLng(lat, lng));
+        var lineCoordinatesPath = new google.maps.Polyline({
+          path: lineCoords,
+          geodesic: true,
+          strokeColor: '#2E10FF'
+        });
+        
+        lineCoordinatesPath.setMap(map);
+      };
+    //-----------------------------------------------//
+
+
+    //------------------------------------------------//
+
+    var pnChannel = "map-channel";
+    var pubnub = new PubNub({
+      publishKey: 'pub-c-68b566d1-8cd5-4081-ab91-9377eb2f3e45',
+      subscribeKey: 'sub-c-c9eb9a28-16fb-11e7-894d-0619f8945a4f'
+    });
+    pubnub.subscribe({channels: [pnChannel]});
+    pubnub.addListener({message:redraw});
+    setInterval(function() {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        window.lat = position.coords.latitude;
+        window.lng = position.coords.longitude;
+
+          //Checks if user goes to restricted areas
+          if(reslocations[0][1]===lat && reslocations[0][2]==lng){
+            console.log("Invalid Entry. Restricted");
+          }
+
+            //Checks if user reaches the target
+            if(locations[1][1]===lat && locations[1][2]==lng){
+              console.log("You Have reached!");
+            }
+
+            // For Presentation:
+            // if(lat===lat && lng==lng){
+            //  console.log("Invalid Entry. Restricted");
+            //  $("#cont").append("Restricted Area");
+            // }
+
+
+            $("#cont").append("Latitude: " + lat + " "+ "Longitude: " + lng + "<br>");
+            person = { "latitude":lat,  "longitude":lng };
+            locObj.push(person);
+
+            $("#btn-get").on('click',function(){
+              $("#jsonDisp").html(JSON.stringify(locObj) + " <br>  ");
+           // window.location = "demo_json.php?x=" + locObj;
+           // $.post("test.php", { json_string:JSON.stringify({name:"John", time:"2pm"}) });
+
+         });
+          });
+
+      pubnub.publish({channel:pnChannel, message:{lat:lat, lng:lng}});
+    }, 1000);
+  </script>
+  <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&key=AIzaSyBQZjvAS11D2nwPhG-XwC6u4kj4Ti6fHPY&callback=initialize"></script>
+
+
+</body>
+</html>
